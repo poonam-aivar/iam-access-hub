@@ -6,61 +6,36 @@ import { Construct } from "constructs";
 
 interface AppRunnerStackProps extends cdk.StackProps {
   portalRoleArn: string;
+  ecrRepository: ecr.Repository;
 }
 
 /**
  * App Runner Stack — Hosts the Next.js application.
- *
- * Creates:
- * 1. ECR repository (stores Docker images)
- * 2. App Runner access role (allows App Runner to pull from ECR)
- * 3. App Runner service (runs the container)
- *
- * The service auto-scales to zero when idle (min 1 instance when active).
- * Cost: ~$0 when idle, pennies per request when active.
+ * Deployed AFTER the Docker image has been pushed to ECR.
  */
 export class AppRunnerStack extends cdk.Stack {
-  public readonly ecrRepository: ecr.Repository;
-  public readonly serviceUrl: string;
-
   constructor(scope: Construct, id: string, props: AppRunnerStackProps) {
     super(scope, id, props);
 
     // ============================================================
-    // ECR Repository
-    // ============================================================
-    this.ecrRepository = new ecr.Repository(this, "AppRepo", {
-      repositoryName: "iam-access-hub",
-      removalPolicy: cdk.RemovalPolicy.RETAIN,
-      lifecycleRules: [
-        {
-          maxImageCount: 5,
-          description: "Keep only last 5 images",
-        },
-      ],
-    });
-
-    // ============================================================
     // App Runner ECR Access Role
-    // Allows App Runner to pull images from our ECR repo
     // ============================================================
     const accessRole = new iam.Role(this, "AppRunnerECRAccessRole", {
       roleName: "IAMAccessHub-AppRunnerAccess",
       assumedBy: new iam.ServicePrincipal("build.apprunner.amazonaws.com"),
     });
 
-    this.ecrRepository.grantPull(accessRole);
+    props.ecrRepository.grantPull(accessRole);
 
     // ============================================================
-    // App Runner Instance Role
-    // The role the running container assumes (same as portal role)
+    // App Runner Instance Role (what the container runs as)
     // ============================================================
     const instanceRole = new iam.Role(this, "AppRunnerInstanceRole", {
       roleName: "IAMAccessHub-AppRunnerInstance",
       assumedBy: new iam.ServicePrincipal("tasks.apprunner.amazonaws.com"),
     });
 
-    // Grant same permissions as the portal role
+    // IAM — manage session roles
     instanceRole.addToPolicy(
       new iam.PolicyStatement({
         sid: "ManageSessionRoles",
@@ -80,6 +55,7 @@ export class AppRunnerStack extends cdk.Stack {
       })
     );
 
+    // STS — assume session roles
     instanceRole.addToPolicy(
       new iam.PolicyStatement({
         sid: "AssumeSessionRoles",
@@ -101,6 +77,7 @@ export class AppRunnerStack extends cdk.Stack {
       })
     );
 
+    // SSO — read-only
     instanceRole.addToPolicy(
       new iam.PolicyStatement({
         sid: "SSOReadAccess",
@@ -114,6 +91,7 @@ export class AppRunnerStack extends cdk.Stack {
       })
     );
 
+    // Bedrock — invoke model
     instanceRole.addToPolicy(
       new iam.PolicyStatement({
         sid: "BedrockInvoke",
@@ -126,6 +104,7 @@ export class AppRunnerStack extends cdk.Stack {
       })
     );
 
+    // DynamoDB — read/write our tables
     instanceRole.addToPolicy(
       new iam.PolicyStatement({
         sid: "DynamoDBAccess",
@@ -145,6 +124,7 @@ export class AppRunnerStack extends cdk.Stack {
       })
     );
 
+    // SSM — read parameters
     instanceRole.addToPolicy(
       new iam.PolicyStatement({
         sid: "SSMReadParameters",
@@ -160,7 +140,7 @@ export class AppRunnerStack extends cdk.Stack {
       })
     );
 
-    // Explicit deny on dangerous actions
+    // Explicit deny
     instanceRole.addToPolicy(
       new iam.PolicyStatement({
         sid: "DenyDangerousActions",
@@ -188,7 +168,7 @@ export class AppRunnerStack extends cdk.Stack {
           accessRoleArn: accessRole.roleArn,
         },
         imageRepository: {
-          imageIdentifier: `${this.ecrRepository.repositoryUri}:latest`,
+          imageIdentifier: `${props.ecrRepository.repositoryUri}:latest`,
           imageRepositoryType: "ECR",
           imageConfiguration: {
             port: "8080",
@@ -224,11 +204,6 @@ export class AppRunnerStack extends cdk.Stack {
     // ============================================================
     // Outputs
     // ============================================================
-    new cdk.CfnOutput(this, "ECRRepositoryUri", {
-      value: this.ecrRepository.repositoryUri,
-      description: "ECR repository URI for pushing Docker images",
-    });
-
     new cdk.CfnOutput(this, "AppRunnerServiceUrl", {
       value: `https://${service.attrServiceUrl}`,
       description: "App Runner service URL",

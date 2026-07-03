@@ -4,6 +4,7 @@ import * as cdk from "aws-cdk-lib";
 import { DatabaseStack } from "../lib/database-stack";
 import { CleanupStack } from "../lib/cleanup-stack";
 import { PortalRoleStack } from "../lib/portal-role-stack";
+import { EcrStack } from "../lib/ecr-stack";
 import { AppRunnerStack } from "../lib/apprunner-stack";
 
 const app = new cdk.App();
@@ -40,10 +41,14 @@ const portalRoleStack = new PortalRoleStack(app, "IAMAccessHub-PortalRole", {
   auditLogsTable: dbStack.auditLogsTable,
 });
 
-// App Runner (hosts the Next.js app)
+// ECR repository (deployed BEFORE Docker image is built)
+const ecrStack = new EcrStack(app, "IAMAccessHub-AppRunner-ECR", { env });
+
+// App Runner service (deployed AFTER Docker image is pushed to ECR)
 new AppRunnerStack(app, "IAMAccessHub-AppRunner", {
   env,
   portalRoleArn: portalRoleStack.portalRole.roleArn,
+  ecrRepository: ecrStack.repository,
 });
 
 // Apply tags to all stacks
