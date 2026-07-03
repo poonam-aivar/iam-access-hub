@@ -116,6 +116,6 @@ jobs:
                 \"AutoDeploymentsEnabled\": false
               }" \
               --instance-configuration '{"Cpu": "0.25 vCPU", "Memory": "0.5 GB"}' \
-              --health-check-configuration '{"Protocol": "HTTP", "Path": "/api/health", "Interval": 20, "Timeout": 5, "HealthyThreshold": 1, "UnhealthyThreshold": 5}' \
+              --health-check-configuration '{"Protocol": "TCP", "Interval": 10, "Timeout": 5, "HealthyThreshold": 1, "UnhealthyThreshold": 3}' \
               --tags Key=project,Value=iam-access-hub Key=purpose,Value=warpspeed Key=owner,Value=poonam-aivar
           fi
