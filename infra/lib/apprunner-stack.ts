@@ -174,6 +174,8 @@ export class AppRunnerStack extends cdk.Stack {
               { name: "APP_REGION", value: this.region },
               { name: "BEDROCK_MODEL_ID", value: "anthropic.claude-3-haiku-20240307-v1:0" },
               { name: "PORTAL_ROLE_ARN", value: props.portalRoleArn },
+              { name: "NEXTAUTH_SECRET", value: "CHANGE_ME_AFTER_DEPLOY" },
+              { name: "NEXTAUTH_URL", value: "https://placeholder.ap-south-1.awsapprunner.com" },
             ],
           },
         },
@@ -186,7 +188,7 @@ export class AppRunnerStack extends cdk.Stack {
       },
       healthCheckConfiguration: {
         protocol: "HTTP",
-        path: "/",
+        path: "/api/health",
         interval: 20,
         timeout: 5,
         healthyThreshold: 1,
