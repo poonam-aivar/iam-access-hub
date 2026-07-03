@@ -20,45 +20,13 @@ The deployment has 3 parts:
 
 ## Step 1: Set Up AWS Credentials for GitHub Actions
 
-You have two options. **Option 2 (static keys) is simpler to start with.**
+The OIDC provider `token.actions.githubusercontent.com` must already exist in your AWS account.
 
-### Option 2: Static Credentials (simpler)
+### Create the deploy role:
 
-1. Create an IAM user for GitHub Actions:
 ```bash
-aws iam create-user --user-name github-actions-iam-access-hub
+ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 
-aws iam attach-user-policy \
-  --user-name github-actions-iam-access-hub \
-  --policy-arn arn:aws:iam::aws:policy/AdministratorAccess
-```
-
-> ⚠️ For production, create a scoped policy instead of AdministratorAccess. But for initial setup this works.
-
-2. Create access keys:
-```bash
-aws iam create-access-key --user-name github-actions-iam-access-hub
-```
-
-3. Add these as GitHub repo secrets:
-   - Go to: https://github.com/poonam-aivar/iam-access-hub/settings/secrets/actions
-   - Add secret: `AWS_ACCESS_KEY_ID` → paste the AccessKeyId
-   - Add secret: `AWS_SECRET_ACCESS_KEY` → paste the SecretAccessKey
-
-That's it — the workflow will use these automatically.
-
-### Option 1: OIDC (recommended for long-term, no static secrets)
-
-1. Create the GitHub OIDC provider in your AWS account:
-```bash
-aws iam create-open-id-connect-provider \
-  --url https://token.actions.githubusercontent.com \
-  --client-id-list sts.amazonaws.com \
-  --thumbprint-list 6938fd4d98bab03faadb97b34396831e3780aea1
-```
-
-2. Create a role that GitHub can assume:
-```bash
 cat > /tmp/trust-policy.json << 'EOF'
 {
   "Version": "2012-10-17",
@@ -83,11 +51,12 @@ cat > /tmp/trust-policy.json << 'EOF'
 EOF
 
 aws iam create-role \
-  --role-name GitHubActions-IAMAccessHub \
-  --assume-role-policy-document file:///tmp/trust-policy.json
+  --role-name GitHubActions-IAMAccessHub-Deploy \
+  --assume-role-policy-document file:///tmp/trust-policy.json \
+  --tags Key=project,Value=iam-access-hub Key=purpose,Value=warpspeed Key=owner,Value=poonam-aivar
 
 aws iam attach-role-policy \
-  --role-name GitHubActions-IAMAccessHub \
+  --role-name GitHubActions-IAMAccessHub-Deploy \
   --policy-arn arn:aws:iam::aws:policy/AdministratorAccess
 ```
 

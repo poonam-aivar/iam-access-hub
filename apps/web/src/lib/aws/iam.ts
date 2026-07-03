@@ -55,6 +55,9 @@ export async function createSessionRole(params: {
     Description: `Temporary role for IAM Access Hub request ${params.requestId}`,
     MaxSessionDuration: params.maxSessionDuration,
     Tags: [
+      { Key: "project", Value: "iam-access-hub" },
+      { Key: "purpose", Value: "warpspeed" },
+      { Key: "owner", Value: "poonam-aivar" },
       { Key: "ManagedBy", Value: "iam-access-hub" },
       { Key: "RequestId", Value: params.requestId },
       { Key: "AutoCleanup", Value: "true" },
