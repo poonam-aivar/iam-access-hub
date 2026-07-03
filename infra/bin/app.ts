@@ -5,7 +5,6 @@ import { DatabaseStack } from "../lib/database-stack";
 import { CleanupStack } from "../lib/cleanup-stack";
 import { PortalRoleStack } from "../lib/portal-role-stack";
 import { EcrStack } from "../lib/ecr-stack";
-import { AppRunnerStack } from "../lib/apprunner-stack";
 
 const app = new cdk.App();
 
@@ -33,7 +32,7 @@ new CleanupStack(app, "IAMAccessHub-Cleanup", {
 });
 
 // Portal execution role (IAM)
-const portalRoleStack = new PortalRoleStack(app, "IAMAccessHub-PortalRole", {
+new PortalRoleStack(app, "IAMAccessHub-PortalRole", {
   env,
   requestsTable: dbStack.requestsTable,
   policyLibraryTable: dbStack.policyLibraryTable,
@@ -41,15 +40,12 @@ const portalRoleStack = new PortalRoleStack(app, "IAMAccessHub-PortalRole", {
   auditLogsTable: dbStack.auditLogsTable,
 });
 
-// ECR repository (deployed BEFORE Docker image is built)
-const ecrStack = new EcrStack(app, "IAMAccessHub-AppRunner-ECR", { env });
+// ECR repository
+new EcrStack(app, "IAMAccessHub-AppRunner-ECR", { env });
 
-// App Runner service (deployed AFTER Docker image is pushed to ECR)
-new AppRunnerStack(app, "IAMAccessHub-AppRunner", {
-  env,
-  portalRoleArn: portalRoleStack.portalRole.roleArn,
-  ecrRepository: ecrStack.repository,
-});
+// NOTE: App Runner service is managed manually (not via CDK)
+// Created via CLI with the IAMAccessHub-AppRunnerAccess role.
+// The pipeline pushes images to ECR and triggers deployment.
 
 // Apply tags to all stacks
 for (const [key, value] of Object.entries(TAGS)) {

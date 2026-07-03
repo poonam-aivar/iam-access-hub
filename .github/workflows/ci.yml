@@ -63,12 +63,12 @@ jobs:
           role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
-      # Step 1: Deploy infra WITHOUT App Runner (ECR, DynamoDB, Lambda, IAM)
-      - name: Deploy base infrastructure
-        run: npx cdk deploy IAMAccessHub-Database IAMAccessHub-Cleanup IAMAccessHub-PortalRole IAMAccessHub-AppRunner-ECR --require-approval never
+      # Deploy CDK infra (DynamoDB, Lambda, IAM roles, ECR)
+      - name: Deploy CDK Stacks
+        run: npx cdk deploy --all --require-approval never
         working-directory: infra
 
-      # Step 2: Build and push Docker image to ECR
+      # Build and push Docker image to ECR
       - name: Login to ECR
         id: ecr-login
         uses: aws-actions/amazon-ecr-login@v2
@@ -83,16 +83,39 @@ jobs:
           docker push $ECR_REPO:${{ github.sha }}
           docker push $ECR_REPO:latest
 
-      # Step 3: Deploy App Runner (now the image exists in ECR)
+      # Deploy App Runner (create if not exists, or trigger new deployment)
       - name: Deploy App Runner
-        run: npx cdk deploy IAMAccessHub-AppRunner --require-approval never
-        working-directory: infra
-
-      # Step 4: If App Runner already exists, trigger new deployment
-      - name: Trigger App Runner deployment
         run: |
+          ECR_REPO=$(aws cloudformation describe-stacks --stack-name IAMAccessHub-AppRunner-ECR --query "Stacks[0].Outputs[?OutputKey=='ECRRepositoryUri'].OutputValue" --output text)
           SERVICE_ARN=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='iam-access-hub'].ServiceArn" --output text)
-          if [ -n "$SERVICE_ARN" ] && [ "$SERVICE_ARN" != "None" ]; then
+
+          if [ -n "$SERVICE_ARN" ] && [ "$SERVICE_ARN" != "None" ] && [ "$SERVICE_ARN" != "" ]; then
+            echo "App Runner service exists. Triggering new deployment..."
             aws apprunner start-deployment --service-arn $SERVICE_ARN
-            echo "Deployment triggered for App Runner service"
+          else
+            echo "Creating App Runner service..."
+            aws apprunner create-service \
+              --service-name iam-access-hub \
+              --source-configuration "{
+                \"AuthenticationConfiguration\": {
+                  \"AccessRoleArn\": \"arn:aws:iam::368886161280:role/IAMAccessHub-AppRunnerAccess\"
+                },
+                \"ImageRepository\": {
+                  \"ImageIdentifier\": \"${ECR_REPO}:latest\",
+                  \"ImageRepositoryType\": \"ECR\",
+                  \"ImageConfiguration\": {
+                    \"Port\": \"8080\",
+                    \"RuntimeEnvironmentVariables\": {
+                      \"NEXTAUTH_SECRET\": \"k8sJ3mP9vL2xR5tN7wQ1yA4fH6dB0cE8gI3jK5lM7n\",
+                      \"NEXTAUTH_URL\": \"https://placeholder.ap-south-1.awsapprunner.com\",
+                      \"APP_REGION\": \"ap-south-1\",
+                      \"BEDROCK_MODEL_ID\": \"anthropic.claude-3-haiku-20240307-v1:0\"
+                    }
+                  }
+                },
+                \"AutoDeploymentsEnabled\": false
+              }" \
+              --instance-configuration '{"Cpu": "0.25 vCPU", "Memory": "0.5 GB"}' \
+              --health-check-configuration '{"Protocol": "HTTP", "Path": "/api/health", "Interval": 20, "Timeout": 5, "HealthyThreshold": 1, "UnhealthyThreshold": 5}' \
+              --tags Key=project,Value=iam-access-hub Key=purpose,Value=warpspeed Key=owner,Value=poonam-aivar
           fi
