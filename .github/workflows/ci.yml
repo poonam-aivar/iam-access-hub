@@ -9,7 +9,6 @@ on:
 env:
   NODE_VERSION: "22"
   AWS_REGION: "ap-south-1"
-  ECR_REPOSITORY: "iam-access-hub"
 
 jobs:
   lint-and-build:
@@ -77,11 +76,12 @@ jobs:
       - name: Build and push Docker image
         env:
           ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
-          IMAGE_TAG: ${{ github.sha }}
         run: |
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -t $ECR_REGISTRY/$ECR_REPOSITORY:latest .
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          ECR_REPO=$(aws cloudformation describe-stacks --stack-name IAMAccessHub-AppRunner-ECR --query "Stacks[0].Outputs[?OutputKey=='ECRRepositoryUri'].OutputValue" --output text)
+          echo "ECR Repo: $ECR_REPO"
+          docker build -t $ECR_REPO:${{ github.sha }} -t $ECR_REPO:latest .
+          docker push $ECR_REPO:${{ github.sha }}
+          docker push $ECR_REPO:latest
 
       # Step 3: Deploy App Runner (now the image exists in ECR)
       - name: Deploy App Runner

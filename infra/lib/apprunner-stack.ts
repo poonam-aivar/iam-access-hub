@@ -21,7 +21,6 @@ export class AppRunnerStack extends cdk.Stack {
     // App Runner ECR Access Role
     // ============================================================
     const accessRole = new iam.Role(this, "AppRunnerECRAccessRole", {
-      roleName: "IAMAccessHub-AppRunnerAccess",
       assumedBy: new iam.ServicePrincipal("build.apprunner.amazonaws.com"),
     });
 
@@ -31,7 +30,6 @@ export class AppRunnerStack extends cdk.Stack {
     // App Runner Instance Role (what the container runs as)
     // ============================================================
     const instanceRole = new iam.Role(this, "AppRunnerInstanceRole", {
-      roleName: "IAMAccessHub-AppRunnerInstance",
       assumedBy: new iam.ServicePrincipal("tasks.apprunner.amazonaws.com"),
     });
 

@@ -13,7 +13,6 @@ export class EcrStack extends cdk.Stack {
     super(scope, id, props);
 
     this.repository = new ecr.Repository(this, "AppRepo", {
-      repositoryName: "iam-access-hub",
       removalPolicy: cdk.RemovalPolicy.RETAIN,
       lifecycleRules: [
         {
