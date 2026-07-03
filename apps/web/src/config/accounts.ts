@@ -99,7 +99,7 @@ export const APP_CONFIG = {
   /** Maximum resources allowed in a generated policy */
   maxPolicyResources: 5,
   /** AWS region */
-  region: process.env.AWS_REGION || "ap-south-1",
+  region: process.env.APP_REGION || "ap-south-1",
   /** Bedrock model for policy generation */
   bedrockModelId:
     process.env.BEDROCK_MODEL_ID || "anthropic.claude-3-haiku-20240307-v1:0",

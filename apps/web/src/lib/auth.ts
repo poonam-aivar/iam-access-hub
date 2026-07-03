@@ -15,9 +15,9 @@ export const authOptions: NextAuthOptions = {
       id: "aws-sso",
       name: "AWS SSO",
       type: "oauth",
-      wellKnown: `${process.env.AWS_SSO_ISSUER_URL}/.well-known/openid-configuration`,
-      clientId: process.env.AWS_SSO_CLIENT_ID!,
-      clientSecret: process.env.AWS_SSO_CLIENT_SECRET!,
+      wellKnown: `${process.env.SSO_ISSUER_URL}/.well-known/openid-configuration`,
+      clientId: process.env.SSO_CLIENT_ID!,
+      clientSecret: process.env.SSO_CLIENT_SECRET!,
       authorization: {
         params: {
           scope: "openid email profile",
