@@ -4,6 +4,7 @@ import * as cdk from "aws-cdk-lib";
 import { DatabaseStack } from "../lib/database-stack";
 import { CleanupStack } from "../lib/cleanup-stack";
 import { PortalRoleStack } from "../lib/portal-role-stack";
+import { AppRunnerStack } from "../lib/apprunner-stack";
 
 const app = new cdk.App();
 
@@ -25,7 +26,7 @@ const TAGS = {
 const dbStack = new DatabaseStack(app, "IAMAccessHub-Database", { env });
 
 // Session cleanup (Lambda + EventBridge)
-const cleanupStack = new CleanupStack(app, "IAMAccessHub-Cleanup", {
+new CleanupStack(app, "IAMAccessHub-Cleanup", {
   env,
   sessionsTable: dbStack.sessionsTable,
 });
@@ -37,6 +38,12 @@ const portalRoleStack = new PortalRoleStack(app, "IAMAccessHub-PortalRole", {
   policyLibraryTable: dbStack.policyLibraryTable,
   sessionsTable: dbStack.sessionsTable,
   auditLogsTable: dbStack.auditLogsTable,
+});
+
+// App Runner (hosts the Next.js app)
+new AppRunnerStack(app, "IAMAccessHub-AppRunner", {
+  env,
+  portalRoleArn: portalRoleStack.portalRole.roleArn,
 });
 
 // Apply tags to all stacks

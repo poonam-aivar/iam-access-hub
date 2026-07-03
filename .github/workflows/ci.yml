@@ -9,6 +9,7 @@ on:
 env:
   NODE_VERSION: "22"
   AWS_REGION: "ap-south-1"
+  ECR_REPOSITORY: "iam-access-hub"
 
 jobs:
   lint-and-build:
@@ -34,8 +35,8 @@ jobs:
       - name: Build
         run: npm run build
 
-  deploy-infra:
-    name: Deploy Infrastructure
+  deploy:
+    name: Deploy
     needs: [lint-and-build]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
@@ -63,6 +64,32 @@ jobs:
           role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
+      # Deploy CDK infra (creates ECR, App Runner, DynamoDB, etc.)
       - name: Deploy CDK Stacks
         run: npx cdk deploy --all --require-approval never
         working-directory: infra
+
+      # Build and push Docker image to ECR
+      - name: Login to ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push Docker image
+        env:
+          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -t $ECR_REGISTRY/$ECR_REPOSITORY:latest .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+
+      # Trigger App Runner to deploy the new image
+      - name: Deploy to App Runner
+        run: |
+          SERVICE_ARN=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='iam-access-hub'].ServiceArn" --output text)
+          if [ -n "$SERVICE_ARN" ]; then
+            aws apprunner start-deployment --service-arn $SERVICE_ARN
+            echo "Deployment triggered for App Runner service"
+          else
+            echo "App Runner service not found — it will pick up the image on next CDK deploy"
+          fi

@@ -1,0 +1,7 @@
+node_modules
+.next
+.git
+cdk.out
+dist
+*.md
+docs/
